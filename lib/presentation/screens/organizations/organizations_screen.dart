@@ -184,7 +184,7 @@ class OrganizationCard extends ConsumerWidget {
                     fit: BoxFit.cover,
                   ),
                   if (organization.verificationStatus ==
-                      OrganizationVerificationStatus.verified)
+                      VerificationStatus.verified)
                     const Positioned(
                       top: 8,
                       right: 8,
@@ -257,7 +257,8 @@ class OrganizationCard extends ConsumerWidget {
                     _buildStat(context, 'Rating', '${organization.rating}'),
                     _buildStat(
                         context, 'Reviews', '${organization.reviewCount}'),
-                    _buildStat(context, 'Shares', '${organization.shareCount}'),
+                    _buildStat(
+                        context, 'Rescues', '${organization.rescueCount}'),
                   ],
                 ),
                 const SizedBox(height: 16),

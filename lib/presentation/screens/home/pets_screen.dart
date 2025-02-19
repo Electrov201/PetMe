@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/models/pet_model.dart';
 import '../../../core/providers/providers.dart';
+import '../../widgets/pet_card.dart';
 
 class PetsScreen extends ConsumerStatefulWidget {
   const PetsScreen({super.key});
@@ -48,64 +49,24 @@ class _PetsScreenState extends ConsumerState<PetsScreen> {
             );
           }
 
+          final filteredPets = _filterPets(petsList);
+
           return GridView.builder(
             padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.8,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+              childAspectRatio: 0.75,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
             ),
-            itemCount: petsList.length,
+            itemCount: filteredPets.length,
             itemBuilder: (context, index) {
-              final pet = petsList[index];
-              return GestureDetector(
-                onTap: () {
-                  context.pushNamed(
-                    'pet-details',
-                    pathParameters: {'id': pet.id},
-                  );
-                },
-                child: Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Hero(
-                          tag: 'pet-image-${pet.id}', // Updated unique tag
-                          child: Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              image: DecorationImage(
-                                image: NetworkImage(pet.images.isNotEmpty
-                                    ? pet.images[0]
-                                    : 'https://via.placeholder.com/150'),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              pet.name,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${pet.breed} • ${pet.age} years',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+              final pet = filteredPets[index];
+              return PetCard(
+                pet: pet,
+                onTap: () => context.pushNamed(
+                  'pet-details',
+                  pathParameters: {'id': pet.id},
                 ),
               );
             },

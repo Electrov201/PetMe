@@ -16,6 +16,8 @@ import '../services/veterinary_service.dart';
 import '../services/donation_service.dart';
 import '../services/health_prediction_service.dart';
 import '../services/cloudinary_service.dart';
+import '../services/organization_service.dart';
+import '../models/organization_model.dart';
 
 // Auth Providers
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
@@ -45,8 +47,43 @@ final petRepositoryProvider = Provider<PetRepository>((ref) {
   return PetRepository(petService);
 });
 
+// Organization Providers
+final organizationServiceProvider = Provider<OrganizationService>(
+  (ref) => OrganizationService(),
+);
+
 final organizationRepositoryProvider = Provider<OrganizationRepository>((ref) {
-  return OrganizationRepository();
+  final organizationService = ref.watch(organizationServiceProvider);
+  return OrganizationRepository(organizationService);
+});
+
+final userOrganizationsProvider =
+    FutureProvider<List<OrganizationModel>>((ref) async {
+  final repository = ref.watch(organizationRepositoryProvider);
+  return repository.getUserOrganizations();
+});
+
+final organizationByIdProvider =
+    FutureProvider.family<OrganizationModel?, String>((ref, id) async {
+  final repository = ref.watch(organizationRepositoryProvider);
+  return repository.getOrganizationById(id);
+});
+
+final organizationStreamProvider =
+    StreamProvider.family<OrganizationModel?, String>((ref, id) {
+  final repository = ref.watch(organizationRepositoryProvider);
+  return repository.streamOrganization(id);
+});
+
+final nearbyOrganizationsProvider = FutureProvider.family<
+    List<OrganizationModel>,
+    ({double latitude, double longitude, double radius})>((ref, params) async {
+  final repository = ref.watch(organizationRepositoryProvider);
+  return repository.getNearbyOrganizations(
+    params.latitude,
+    params.longitude,
+    params.radius,
+  );
 });
 
 final rescueRequestRepositoryProvider =
@@ -99,4 +136,21 @@ final userPetsProvider =
     StreamProvider.family<List<PetModel>, String>((ref, userId) {
   final petService = ref.watch(petServiceProvider);
   return petService.streamUserPets(userId);
+});
+
+final petByIdProvider =
+    FutureProvider.family<PetModel?, String>((ref, petId) async {
+  final petRepository = ref.watch(petRepositoryProvider);
+  final currentUser = ref.watch(authStateProvider).value;
+  if (currentUser == null) return null;
+  return petRepository.getPetById(currentUser.id, petId);
+});
+
+// Stream provider for real-time pet updates
+final petStreamProvider =
+    StreamProvider.family<PetModel?, String>((ref, petId) {
+  final petService = ref.watch(petServiceProvider);
+  final currentUser = ref.watch(authStateProvider).value;
+  if (currentUser == null) return Stream.value(null);
+  return petService.streamPetById(currentUser.id, petId);
 });

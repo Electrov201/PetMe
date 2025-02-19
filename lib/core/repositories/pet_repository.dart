@@ -31,6 +31,18 @@ class PetRepository {
     return _petService.deletePet(petId);
   }
 
+  Future<void> toggleLike(String petId) async {
+    return _petService.toggleLike(petId);
+  }
+
+  Future<void> addComment(String petId, String comment) async {
+    return _petService.addComment(petId, comment);
+  }
+
+  Future<void> incrementShares(String petId) async {
+    return _petService.incrementShares(petId);
+  }
+
   Future<List<PetModel>> getNearbyPets(
     double lat,
     double lng,

@@ -24,6 +24,9 @@ class PetModel {
   final List<String> images;
   final Map<String, dynamic>? medicalHistory;
   final Map<String, dynamic>? behavior;
+  final List<String> likedBy;
+  final List<Map<String, dynamic>> comments;
+  final int shares;
 
   PetModel({
     required this.id,
@@ -42,6 +45,9 @@ class PetModel {
     required this.images,
     this.medicalHistory,
     this.behavior,
+    this.likedBy = const [],
+    this.comments = const [],
+    this.shares = 0,
   });
 
   Map<String, dynamic> toMap() {
@@ -64,6 +70,9 @@ class PetModel {
       'images': images,
       'medicalHistory': medicalHistory,
       'behavior': behavior,
+      'likedBy': likedBy,
+      'comments': comments,
+      'shares': shares,
     };
   }
 
@@ -90,6 +99,9 @@ class PetModel {
       images: List<String>.from(map['images'] as List<dynamic>),
       medicalHistory: map['medicalHistory'] as Map<String, dynamic>?,
       behavior: map['behavior'] as Map<String, dynamic>?,
+      likedBy: List<String>.from(map['likedBy'] ?? []),
+      comments: List<Map<String, dynamic>>.from(map['comments'] ?? []),
+      shares: map['shares'] as int? ?? 0,
     );
   }
 
@@ -110,6 +122,9 @@ class PetModel {
     List<String>? images,
     Map<String, dynamic>? medicalHistory,
     Map<String, dynamic>? behavior,
+    List<String>? likedBy,
+    List<Map<String, dynamic>>? comments,
+    int? shares,
   }) {
     return PetModel(
       id: id ?? this.id,
@@ -128,6 +143,9 @@ class PetModel {
       images: images ?? this.images,
       medicalHistory: medicalHistory ?? this.medicalHistory,
       behavior: behavior ?? this.behavior,
+      likedBy: likedBy ?? this.likedBy,
+      comments: comments ?? this.comments,
+      shares: shares ?? this.shares,
     );
   }
 }

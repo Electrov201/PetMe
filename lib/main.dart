@@ -5,21 +5,31 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+// Core imports
 import 'core/models/chat_model.dart';
-import 'package:petme/presentation/screens/profile/activity_history_screen.dart';
-import 'package:petme/presentation/screens/profile/favorites_screen.dart';
-import 'package:petme/presentation/screens/profile/my_pets_screen.dart';
-import 'package:petme/presentation/screens/profile/settings_screen.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/providers.dart';
+import 'core/routes.dart';
+import 'core/config/app_config.dart';
+
+// Feature imports
+import 'features/organization/screens/organization_screen.dart';
+import 'features/organization/screens/register_organization_screen.dart';
+import 'features/organization/screens/organization_details_screen.dart';
+
+// Presentation imports
 import 'presentation/screens/splash_screen.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/screens/auth/register_screen.dart';
 import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/home/pets_screen.dart';
-import 'presentation/screens/home/organizations_screen.dart';
 import 'presentation/screens/home/map_screen.dart';
 import 'presentation/screens/home/profile_screen.dart';
+import 'presentation/screens/profile/activity_history_screen.dart';
+import 'presentation/screens/profile/favorites_screen.dart';
+import 'presentation/screens/profile/my_pets_screen.dart';
+import 'presentation/screens/profile/settings_screen.dart';
 import 'presentation/screens/rescue_request/rescue_request_screen.dart';
 import 'presentation/screens/feeding_point/feeding_point_screen.dart';
 import 'presentation/screens/veterinary/veterinary_screen.dart';
@@ -35,8 +45,6 @@ import 'presentation/screens/veterinary/add_veterinary_screen.dart';
 import 'presentation/screens/veterinary/veterinary_details_screen.dart';
 import 'presentation/screens/feeding_point/add_feeding_point_screen.dart';
 import 'presentation/screens/feeding_point/feeding_point_details_screen.dart';
-import 'core/routes.dart';
-import 'core/config/app_config.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -96,7 +104,21 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'organizations',
             name: 'organizations',
-            builder: (context, state) => const OrganizationsScreen(),
+            builder: (context, state) => const OrganizationScreen(),
+            routes: [
+              GoRoute(
+                path: 'register',
+                name: 'register-organization',
+                builder: (context, state) => const RegisterOrganizationScreen(),
+              ),
+              GoRoute(
+                path: ':id',
+                name: 'organization-details',
+                builder: (context, state) => OrganizationDetailsScreen(
+                  organizationId: state.pathParameters['id']!,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: 'map',

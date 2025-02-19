@@ -71,12 +71,21 @@ class PetService {
     try {
       if (_userId.isEmpty) throw Exception('User not authenticated');
 
+      // Update in user's pets collection
       await _firestore
           .collection('users')
           .doc(_userId)
           .collection('pets')
           .doc(pet.id)
           .update(pet.toMap());
+
+      // Update or remove from global pets collection based on status
+      if (pet.status == PetStatus.available) {
+        await _firestore.collection('pets').doc(pet.id).set(pet.toMap());
+      } else {
+        // If pet is no longer available, remove from global collection
+        await _firestore.collection('pets').doc(pet.id).delete();
+      }
     } catch (e) {
       throw Exception('Failed to update pet: $e');
     }
@@ -108,6 +117,40 @@ class PetService {
         .map((snapshot) => snapshot.docs
             .map((doc) => PetModel.fromMap({...doc.data(), 'id': doc.id}))
             .toList());
+  }
+
+  // Stream individual pet updates
+  Stream<PetModel?> streamPetById(String userId, String petId) {
+    // Create streams for both collections
+    final userPetStream = _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('pets')
+        .doc(petId)
+        .snapshots();
+
+    final globalPetStream =
+        _firestore.collection('pets').doc(petId).snapshots();
+
+    // Combine both streams
+    return userPetStream.asyncMap((userDoc) async {
+      final globalDoc = await globalPetStream.first;
+
+      // If neither document exists, return null
+      if (!userDoc.exists && !globalDoc.exists) return null;
+
+      // Prefer user's pet document if it exists
+      if (userDoc.exists) {
+        return PetModel.fromMap({...userDoc.data()!, 'id': userDoc.id});
+      }
+
+      // Fall back to global pet document
+      if (globalDoc.exists) {
+        return PetModel.fromMap({...globalDoc.data()!, 'id': globalDoc.id});
+      }
+
+      return null;
+    });
   }
 
   // Get all available pets (across all users)
@@ -184,6 +227,133 @@ class PetService {
       });
     } catch (e) {
       throw Exception('Failed to update behavior notes: $e');
+    }
+  }
+
+  // Social Interactions
+  Future<void> toggleLike(String petId) async {
+    try {
+      if (_userId.isEmpty) throw Exception('User not authenticated');
+
+      final petRef = _firestore.collection('pets').doc(petId);
+      final userPetRef = _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('pets')
+          .doc(petId);
+
+      return _firestore.runTransaction((transaction) async {
+        final petDoc = await transaction.get(petRef);
+        final userPetDoc = await transaction.get(userPetRef);
+
+        if (!petDoc.exists && !userPetDoc.exists) {
+          throw Exception('Pet not found');
+        }
+
+        List<String> likedBy =
+            List<String>.from(petDoc.data()?['likedBy'] ?? []);
+
+        if (likedBy.contains(_userId)) {
+          likedBy.remove(_userId);
+        } else {
+          likedBy.add(_userId);
+        }
+
+        if (petDoc.exists) {
+          transaction.update(petRef, {'likedBy': likedBy});
+        }
+        if (userPetDoc.exists) {
+          transaction.update(userPetRef, {'likedBy': likedBy});
+        }
+      });
+    } catch (e) {
+      throw Exception('Failed to toggle like: $e');
+    }
+  }
+
+  Future<void> addComment(String petId, String text) async {
+    try {
+      if (_userId.isEmpty) throw Exception('User not authenticated');
+
+      final comment = {
+        'userId': _userId,
+        'text': text,
+        'userName': _auth.currentUser?.displayName ?? 'Anonymous',
+        'timestamp': FieldValue.serverTimestamp(),
+      };
+
+      final batch = _firestore.batch();
+      final userPetRef = _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('pets')
+          .doc(petId);
+
+      final globalPetRef = _firestore.collection('pets').doc(petId);
+
+      // Get current comments from user's pet document
+      final userPetDoc = await userPetRef.get();
+      if (!userPetDoc.exists) {
+        final globalPetDoc = await globalPetRef.get();
+        if (!globalPetDoc.exists) {
+          throw Exception('Pet not found');
+        }
+      }
+
+      // Get existing comments or initialize empty list
+      List<Map<String, dynamic>> comments = [];
+      if (userPetDoc.exists && userPetDoc.data()?['comments'] != null) {
+        comments = List<Map<String, dynamic>>.from(
+            userPetDoc.data()?['comments'] ?? []);
+      } else {
+        final globalPetDoc = await globalPetRef.get();
+        if (globalPetDoc.exists && globalPetDoc.data()?['comments'] != null) {
+          comments = List<Map<String, dynamic>>.from(
+              globalPetDoc.data()?['comments'] ?? []);
+        }
+      }
+
+      // Add new comment
+      comments.add(comment);
+
+      // Update both documents atomically
+      batch.update(userPetRef, {'comments': comments});
+      batch.update(globalPetRef, {'comments': comments});
+
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Failed to add comment: $e');
+    }
+  }
+
+  Future<void> incrementShares(String petId) async {
+    try {
+      final petRef = _firestore.collection('pets').doc(petId);
+      final userPetRef = _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('pets')
+          .doc(petId);
+
+      return _firestore.runTransaction((transaction) async {
+        final petDoc = await transaction.get(petRef);
+        final userPetDoc = await transaction.get(userPetRef);
+
+        if (!petDoc.exists && !userPetDoc.exists) {
+          throw Exception('Pet not found');
+        }
+
+        final currentShares = (petDoc.data()?['shares'] ?? 0) + 1;
+
+        if (petDoc.exists) {
+          transaction.update(petRef, {'shares': currentShares});
+        }
+        if (userPetDoc.exists) {
+          transaction.update(userPetRef, {'shares': currentShares});
+        }
+      });
+    } catch (e) {
+      throw Exception('Failed to increment shares: $e');
     }
   }
 }

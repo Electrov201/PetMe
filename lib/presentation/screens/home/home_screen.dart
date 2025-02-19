@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/chat_provider.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../features/organization/screens/organization_screen.dart';
 import 'pets_screen.dart';
-import 'organizations_screen.dart';
 import 'map_screen.dart';
 import 'profile_screen.dart';
 import '../chat/chat_screen.dart';
@@ -22,7 +22,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   final List<Widget> _screens = const [
     PetsScreen(),
-    OrganizationsScreen(),
+    OrganizationScreen(),
     RescueRequestScreen(),
     MapScreen(),
     ChatScreen(),
@@ -80,6 +80,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   onTap: () {
                     context.pop();
                     context.go('/home/veterinaries/add');
+                  },
+                ),
+                _buildQuickActionButton(
+                  icon: Icons.business,
+                  label: 'Register Organization',
+                  onTap: () {
+                    context.pop();
+                    context.go('/home/organizations/register');
+                  },
+                ),
+                _buildQuickActionButton(
+                  icon: Icons.location_on,
+                  label: 'Nearby Organizations',
+                  onTap: () {
+                    context.pop();
+                    context.go('/home/organizations');
                   },
                 ),
               ],
@@ -195,20 +211,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget? _buildFloatingActionButton(BuildContext context) {
-    if (_currentIndex == 0) {
-      // Pets screen
-      return FloatingActionButton.extended(
-        onPressed: () => context.go('/home/pets/add'),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Pet'),
-        tooltip: 'Add a new pet',
-      );
-    } else {
-      return FloatingActionButton(
-        onPressed: _showQuickActions,
-        child: const Icon(Icons.add),
-        tooltip: 'Quick Actions',
-      );
+    switch (_currentIndex) {
+      case 0: // Pets screen
+        return FloatingActionButton.extended(
+          onPressed: () => context.go('/home/pets/add'),
+          label: const Text('Add Pet'),
+          icon: const Icon(Icons.add),
+        );
+      case 1: // Organizations screen
+        return FloatingActionButton.extended(
+          onPressed: () => context.go('/home/organizations/register'),
+          label: const Text('Register'),
+          icon: const Icon(Icons.add_business),
+        );
+      case 2: // Rescue screen
+        return FloatingActionButton(
+          onPressed: _showQuickActions,
+          child: const Icon(Icons.add),
+        );
+      default:
+        return null;
     }
   }
 }

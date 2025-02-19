@@ -1,0 +1,164 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidComment() {
+      let comment = request.resource.data.comments[-1];  // Get the last comment
+      return comment.userId == request.auth.uid 
+        && comment.text is string 
+        && comment.text.size() > 0 
+        && comment.text.size() <= 1000
+        && comment.timestamp is timestamp;
+    }
+    
+    // Global collections
+    match /pets/{petId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        // Allow update if only updating comments, likes, or shares
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['comments', 'likedBy', 'shares']) ||
+        // Or if user is the owner
+        resource.data.reporterId == request.auth.uid
+      );
+    }
+    
+    match /veterinaries/{vetId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /feeding_points/{pointId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    match /rescue_requests/{requestId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    // User profile and settings
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      
+      // User's pets
+      match /pets/{petId} {
+        allow read: if isAuthenticated();
+        allow create, delete: if isOwner(userId);
+        allow update: if isAuthenticated() && (
+          // Allow update if only updating comments, likes, or shares
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['comments', 'likedBy', 'shares']) ||
+          // Or if user is the owner
+          isOwner(userId)
+        );
+        
+        // Pet's medical records
+        match /medical/{recordId} {
+          allow read: if isAuthenticated();
+          allow write: if isOwner(userId);
+        }
+      }
+      
+      // User's rescue requests
+      match /rescue_requests/{requestId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId);
+        
+        // Rescue updates
+        match /updates/{updateId} {
+          allow read: if isAuthenticated();
+          allow write: if isOwner(userId);
+        }
+      }
+      
+      // User's feeding points
+      match /feeding_points/{pointId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId);
+        
+        // Feeding point updates
+        match /updates/{updateId} {
+          allow read: if isAuthenticated();
+          allow write: if isOwner(userId);
+        }
+      }
+      
+      // User's veterinary services
+      match /veterinary/{vetId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId);
+        
+        // Veterinary appointments
+        match /appointments/{appointmentId} {
+          allow read: if isAuthenticated();
+          allow write: if isOwner(userId);
+        }
+      }
+      
+      // User's donations
+      match /donations/{donationId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId);
+      }
+      
+      // User's favorites
+      match /favorites/{type} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId);
+      }
+      
+      // User's activity history
+      match /activities/{activityId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+      
+      // User's notifications
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+    }
+    
+    // Public collections (with user-specific subcollections)
+    match /organizations/{orgId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      
+      // Organization's posts
+      match /posts/{postId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && request.resource.data.authorId == request.auth.uid;
+        allow update, delete: if isAuthenticated() && resource.data.authorId == request.auth.uid;
+      }
+    }
+    
+    // Chat system
+    match /chats/{chatId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.participants;
+      allow create: if request.auth != null && request.auth.uid in request.resource.data.participants;
+      allow update: if request.auth != null && request.auth.uid in resource.data.participants;
+      
+      // Chat messages
+      match /messages/{messageId} {
+        allow read: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+      }
+    }
+  }
+} 

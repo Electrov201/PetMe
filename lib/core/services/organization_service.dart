@@ -1,16 +1,30 @@
 import 'dart:math' show asin, cos, pi, pow, sin, sqrt;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/organization_model.dart';
 
 class OrganizationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final String _collection = 'organizations';
+
+  String get _userId => _auth.currentUser?.uid ?? '';
 
   // Create organization
   Future<void> createOrganization(OrganizationModel organization) async {
     try {
+      if (_userId.isEmpty) throw Exception('User not authenticated');
+
       await _firestore
           .collection(_collection)
+          .doc(organization.id)
+          .set(organization.toMap());
+
+      // Add to user's organizations
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('organizations')
           .doc(organization.id)
           .set(organization.toMap());
     } catch (e) {
@@ -44,10 +58,27 @@ class OrganizationService {
   // Update organization
   Future<void> updateOrganization(OrganizationModel organization) async {
     try {
-      await _firestore
-          .collection(_collection)
-          .doc(organization.id)
-          .update(organization.toMap());
+      if (_userId.isEmpty) throw Exception('User not authenticated');
+
+      final batch = _firestore.batch();
+
+      // Update in organizations collection
+      batch.update(
+        _firestore.collection(_collection).doc(organization.id),
+        organization.toMap(),
+      );
+
+      // Update in user's organizations collection
+      batch.update(
+        _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('organizations')
+            .doc(organization.id),
+        organization.toMap(),
+      );
+
+      await batch.commit();
     } catch (e) {
       throw Exception('Failed to update organization: $e');
     }
@@ -56,7 +87,23 @@ class OrganizationService {
   // Delete organization
   Future<void> deleteOrganization(String id) async {
     try {
-      await _firestore.collection(_collection).doc(id).delete();
+      if (_userId.isEmpty) throw Exception('User not authenticated');
+
+      final batch = _firestore.batch();
+
+      // Delete from organizations collection
+      batch.delete(_firestore.collection(_collection).doc(id));
+
+      // Delete from user's organizations collection
+      batch.delete(
+        _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('organizations')
+            .doc(id),
+      );
+
+      await batch.commit();
     } catch (e) {
       throw Exception('Failed to delete organization: $e');
     }
@@ -202,10 +249,7 @@ class OrganizationService {
     return _firestore
         .collection(_collection)
         .where('verificationStatus',
-            isEqualTo: OrganizationVerificationStatus.verified
-                .toString()
-                .split('.')
-                .last)
+            isEqualTo: VerificationStatus.verified.toString().split('.').last)
         .where('isActive', isEqualTo: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
@@ -244,7 +288,7 @@ class OrganizationService {
 
       return organizations.where((org) {
         final searchableText =
-            '${org.name} ${org.description} ${org.tags.join(' ')}'
+            '${org.name} ${org.description} ${org.services.join(' ')}'
                 .toLowerCase();
         return searchableText.contains(query.toLowerCase());
       }).toList();
@@ -260,18 +304,13 @@ class OrganizationService {
     double radiusInKm,
   ) async {
     try {
-      // Note: For proper geoqueries, consider using a solution like GeoFlutterFire
-      final snapshot = await _firestore
-          .collection(_collection)
-          .where('isActive', isEqualTo: true)
-          .get();
+      // Get all organizations (in a real app, you'd use geoqueries)
+      final snapshot = await _firestore.collection(_collection).get();
 
       final organizations = snapshot.docs
           .map(
               (doc) => OrganizationModel.fromMap({...doc.data(), 'id': doc.id}))
-          .toList();
-
-      return organizations.where((org) {
+          .where((org) {
         final distance = _calculateDistance(
           latitude,
           longitude,
@@ -280,8 +319,161 @@ class OrganizationService {
         );
         return distance <= radiusInKm;
       }).toList();
+
+      // Sort by distance
+      organizations.sort((a, b) {
+        final distanceA = _calculateDistance(
+          latitude,
+          longitude,
+          a.latitude,
+          a.longitude,
+        );
+        final distanceB = _calculateDistance(
+          latitude,
+          longitude,
+          b.latitude,
+          b.longitude,
+        );
+        return distanceA.compareTo(distanceB);
+      });
+
+      return organizations;
     } catch (e) {
       throw Exception('Failed to get nearby organizations: $e');
+    }
+  }
+
+  // Get user's organizations
+  Future<List<OrganizationModel>> getUserOrganizations() async {
+    try {
+      if (_userId.isEmpty) return [];
+
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('organizations')
+          .get();
+
+      return snapshot.docs
+          .map(
+              (doc) => OrganizationModel.fromMap({...doc.data(), 'id': doc.id}))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to get user organizations: $e');
+    }
+  }
+
+  // Stream organization updates
+  Stream<OrganizationModel?> streamOrganization(String id) {
+    return _firestore.collection(_collection).doc(id).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return OrganizationModel.fromMap({...doc.data()!, 'id': doc.id});
+    });
+  }
+
+  // Add event to organization
+  Future<void> addEvent(String orgId, Map<String, dynamic> event) async {
+    try {
+      if (_userId.isEmpty) throw Exception('User not authenticated');
+
+      final batch = _firestore.batch();
+      final eventWithTimestamp = {
+        ...event,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      // Add to organizations collection
+      batch.update(
+        _firestore.collection(_collection).doc(orgId),
+        {
+          'events': FieldValue.arrayUnion([eventWithTimestamp])
+        },
+      );
+
+      // Add to user's organizations collection
+      batch.update(
+        _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('organizations')
+            .doc(orgId),
+        {
+          'events': FieldValue.arrayUnion([eventWithTimestamp])
+        },
+      );
+
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Failed to add event: $e');
+    }
+  }
+
+  // Add project to organization
+  Future<void> addProject(String orgId, Map<String, dynamic> project) async {
+    try {
+      if (_userId.isEmpty) throw Exception('User not authenticated');
+
+      final batch = _firestore.batch();
+      final projectWithTimestamp = {
+        ...project,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      // Add to organizations collection
+      batch.update(
+        _firestore.collection(_collection).doc(orgId),
+        {
+          'projects': FieldValue.arrayUnion([projectWithTimestamp])
+        },
+      );
+
+      // Add to user's organizations collection
+      batch.update(
+        _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('organizations')
+            .doc(orgId),
+        {
+          'projects': FieldValue.arrayUnion([projectWithTimestamp])
+        },
+      );
+
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Failed to add project: $e');
+    }
+  }
+
+  // Update donation details
+  Future<void> updateDonationDetails(
+    String orgId,
+    Map<String, dynamic> details,
+  ) async {
+    try {
+      if (_userId.isEmpty) throw Exception('User not authenticated');
+
+      final batch = _firestore.batch();
+
+      // Update in organizations collection
+      batch.update(
+        _firestore.collection(_collection).doc(orgId),
+        {'donationDetails': details},
+      );
+
+      // Update in user's organizations collection
+      batch.update(
+        _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('organizations')
+            .doc(orgId),
+        {'donationDetails': details},
+      );
+
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Failed to update donation details: $e');
     }
   }
 
