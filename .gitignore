@@ -52,7 +52,7 @@ app.*.map.json
 # Environment files
 .env
 .env.*
-*.env
+!.env.example
 
 # Firebase config files
 google-services.json
