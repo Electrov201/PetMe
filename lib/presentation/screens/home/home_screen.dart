@@ -9,27 +9,105 @@ import 'map_screen.dart';
 import 'profile_screen.dart';
 import '../chat/chat_screen.dart';
 import '../rescue_request/rescue_request_screen.dart';
+import '../../../core/theme/app_theme.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  final String initialPath;
+  final Widget child;
+
+  const HomeScreen({
+    super.key,
+    required this.initialPath,
+    required this.child,
+  });
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex;
 
-  final List<Widget> _screens = const [
-    PetsScreen(),
-    OrganizationScreen(),
-    RescueRequestScreen(),
-    MapScreen(),
-    ChatScreen(),
-    ProfileScreen(),
+  final List<({String label, IconData icon, String route})> _navigationItems = [
+    (label: 'Home', icon: Icons.home, route: '/home'),
+    (
+      label: 'Organizations',
+      icon: Icons.business,
+      route: '/home/organizations'
+    ),
+    (
+      label: 'Rescue',
+      icon: Icons.warning_rounded,
+      route: '/home/rescue-requests'
+    ),
+    (label: 'Map', icon: Icons.map, route: '/home/map'),
+    (label: 'Profile', icon: Icons.person, route: '/home/profile'),
   ];
 
-  void _showQuickActions() {
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = _getInitialIndex();
+  }
+
+  int _getInitialIndex() {
+    return _navigationItems
+        .indexWhere((item) => widget.initialPath.startsWith(item.route));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: widget.child,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) {
+          setState(() => _currentIndex = index);
+          context.go(_navigationItems[index].route);
+        },
+        destinations: _navigationItems.map((item) {
+          if (item.route == '/home/rescue-requests') {
+            return NavigationDestination(
+              icon: Icon(item.icon, color: Theme.of(context).colorScheme.error),
+              label: item.label,
+            );
+          }
+          return NavigationDestination(
+            icon: Icon(item.icon),
+            label: item.label,
+          );
+        }).toList(),
+      ),
+      floatingActionButton: _buildFloatingActionButton(context),
+      extendBody: true,
+    );
+  }
+
+  Widget? _buildFloatingActionButton(BuildContext context) {
+    switch (_currentIndex) {
+      case 0: // Pets screen
+        return FloatingActionButton.extended(
+          onPressed: () => context.go('/home/pets/add'),
+          label: const Text('Add Pet'),
+          icon: const Icon(Icons.add),
+        );
+      case 1: // Organizations screen
+        return FloatingActionButton.extended(
+          onPressed: () => context.go('/home/organizations/register'),
+          label: const Text('Register'),
+          icon: const Icon(Icons.add_business),
+        );
+      case 2: // Rescue screen
+        return FloatingActionButton(
+          onPressed: () => _showQuickActions(context),
+          child: const Icon(Icons.add),
+        );
+      default:
+        return null;
+    }
+  }
+
+  void _showQuickActions(BuildContext context) {
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -51,6 +129,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               runSpacing: 20,
               children: [
                 _buildQuickActionButton(
+                  context: context,
                   icon: Icons.medical_services,
                   label: 'Health Check',
                   onTap: () {
@@ -59,6 +138,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   },
                 ),
                 _buildQuickActionButton(
+                  context: context,
                   icon: Icons.warning_rounded,
                   label: 'Rescue Request',
                   onTap: () {
@@ -67,6 +147,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   },
                 ),
                 _buildQuickActionButton(
+                  context: context,
                   icon: Icons.restaurant,
                   label: 'Add Feeding Point',
                   onTap: () {
@@ -75,6 +156,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   },
                 ),
                 _buildQuickActionButton(
+                  context: context,
                   icon: Icons.local_hospital,
                   label: 'Add Veterinary',
                   onTap: () {
@@ -83,6 +165,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   },
                 ),
                 _buildQuickActionButton(
+                  context: context,
                   icon: Icons.business,
                   label: 'Register Organization',
                   onTap: () {
@@ -91,6 +174,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   },
                 ),
                 _buildQuickActionButton(
+                  context: context,
                   icon: Icons.location_on,
                   label: 'Nearby Organizations',
                   onTap: () {
@@ -107,6 +191,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildQuickActionButton({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required VoidCallback onTap,
@@ -144,93 +229,5 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final unreadCount = ref.watch(unreadMessagesProvider).value ?? 0;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        backgroundColor: colorScheme.surface,
-        elevation: 8,
-        height: 65,
-        destinations: [
-          NavigationDestination(
-            icon: Icon(Icons.pets, color: colorScheme.onSurface),
-            selectedIcon: Icon(Icons.pets, color: colorScheme.primary),
-            label: 'Pets',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.business, color: colorScheme.onSurface),
-            selectedIcon: Icon(Icons.business, color: colorScheme.primary),
-            label: 'Organizations',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.warning_rounded, color: colorScheme.onSurface),
-            selectedIcon:
-                Icon(Icons.warning_rounded, color: colorScheme.primary),
-            label: 'Rescue',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.map, color: colorScheme.onSurface),
-            selectedIcon: Icon(Icons.map, color: colorScheme.primary),
-            label: 'Map',
-          ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: unreadCount > 0,
-              label: Text('$unreadCount'),
-              child: Icon(Icons.chat, color: colorScheme.onSurface),
-            ),
-            selectedIcon: Badge(
-              isLabelVisible: unreadCount > 0,
-              label: Text('$unreadCount'),
-              child: Icon(Icons.chat, color: colorScheme.primary),
-            ),
-            label: 'Chat',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person, color: colorScheme.onSurface),
-            selectedIcon: Icon(Icons.person, color: colorScheme.primary),
-            label: 'Profile',
-          ),
-        ],
-      ),
-      floatingActionButton: _buildFloatingActionButton(context),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-    );
-  }
-
-  Widget? _buildFloatingActionButton(BuildContext context) {
-    switch (_currentIndex) {
-      case 0: // Pets screen
-        return FloatingActionButton.extended(
-          onPressed: () => context.go('/home/pets/add'),
-          label: const Text('Add Pet'),
-          icon: const Icon(Icons.add),
-        );
-      case 1: // Organizations screen
-        return FloatingActionButton.extended(
-          onPressed: () => context.go('/home/organizations/register'),
-          label: const Text('Register'),
-          icon: const Icon(Icons.add_business),
-        );
-      case 2: // Rescue screen
-        return FloatingActionButton(
-          onPressed: _showQuickActions,
-          child: const Icon(Icons.add),
-        );
-      default:
-        return null;
-    }
   }
 }

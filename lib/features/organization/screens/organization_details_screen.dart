@@ -6,7 +6,7 @@ import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class OrganizationDetailsScreen extends ConsumerWidget {
+class OrganizationDetailsScreen extends ConsumerStatefulWidget {
   final String organizationId;
 
   const OrganizationDetailsScreen({
@@ -15,11 +15,21 @@ class OrganizationDetailsScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OrganizationDetailsScreen> createState() =>
+      _OrganizationDetailsScreenState();
+}
+
+class _OrganizationDetailsScreenState
+    extends ConsumerState<OrganizationDetailsScreen> {
+  @override
+  Widget build(BuildContext context) {
     final organizationStream =
-        ref.watch(organizationStreamProvider(organizationId));
+        ref.watch(organizationStreamProvider(widget.organizationId));
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Organization Details'),
+      ),
       body: organizationStream.when(
         data: (organization) {
           if (organization == null) {
@@ -209,16 +219,6 @@ class OrganizationDetailsScreen extends ConsumerWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _buildStat(
-                              context,
-                              'Rating',
-                              organization.rating.toStringAsFixed(1),
-                            ),
-                            _buildStat(
-                              context,
-                              'Reviews',
-                              organization.reviewCount.toString(),
-                            ),
                             _buildStat(
                               context,
                               'Rescues',

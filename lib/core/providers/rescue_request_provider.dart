@@ -1,11 +1,34 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../models/rescue_request_model.dart';
 
+final rescueRequestsProvider = StreamProvider<List<RescueRequest>>((ref) {
+  return FirebaseFirestore.instance
+      .collection('rescueRequests')
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((snapshot) => snapshot.docs
+          .map((doc) => RescueRequest.fromFirestore(doc))
+          .toList());
+});
+
+final userRescueRequestsProvider =
+    StreamProvider.family<List<RescueRequest>, String>((ref, userId) {
+  return FirebaseFirestore.instance
+      .collection('rescueRequests')
+      .where('userId', isEqualTo: userId)
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((snapshot) => snapshot.docs
+          .map((doc) => RescueRequest.fromFirestore(doc))
+          .toList());
+});
+
 class RescueRequestService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final _firestore = FirebaseFirestore.instance;
+  final _storage = FirebaseStorage.instance;
 
   Future<String> _uploadImage(File imageFile) async {
     try {
@@ -44,7 +67,7 @@ class RescueRequestService {
     }
   }
 
-  Future<DocumentReference> addRescueRequest(RescueRequest request,
+  Future<DocumentReference> createRescueRequest(RescueRequest request,
       {File? imageFile}) async {
     DocumentReference? docRef;
     String? uploadedImageUrl;
@@ -90,31 +113,6 @@ class RescueRequestService {
     }
   }
 
-  Future<List<RescueRequest>> getRescueRequests() async {
-    try {
-      final snapshot = await _firestore
-          .collection('rescueRequests')
-          .orderBy('createdAt', descending: true)
-          .get();
-      return snapshot.docs
-          .map((doc) => RescueRequest.fromFirestore(doc))
-          .toList();
-    } catch (e) {
-      throw Exception('Failed to fetch rescue requests: $e');
-    }
-  }
-
-  Future<RescueRequest?> getRescueRequestById(String id) async {
-    try {
-      final snapshot =
-          await _firestore.collection('rescueRequests').doc(id).get();
-      if (!snapshot.exists) return null;
-      return RescueRequest.fromFirestore(snapshot);
-    } catch (e) {
-      throw Exception('Failed to fetch rescue request: $e');
-    }
-  }
-
   Future<void> updateRescueRequest(RescueRequest request,
       {File? newImageFile}) async {
     String? newImageUrl;
@@ -152,19 +150,17 @@ class RescueRequestService {
     }
   }
 
-  Future<void> deleteRescueRequest(String id) async {
+  Future<void> deleteRescueRequest(RescueRequest request) async {
     try {
-      final docRef = _firestore.collection('rescueRequests').doc(id);
-      final doc = await docRef.get();
-
-      if (!doc.exists) {
-        throw Exception('Request does not exist');
-      }
-
-      final request = RescueRequest.fromFirestore(doc);
-
       // Use transaction to ensure atomicity
       await _firestore.runTransaction((transaction) async {
+        final docRef = _firestore.collection('rescueRequests').doc(request.id);
+        final snapshot = await transaction.get(docRef);
+
+        if (!snapshot.exists) {
+          throw Exception('Request does not exist');
+        }
+
         transaction.delete(docRef);
       });
 
@@ -229,3 +225,7 @@ class RescueRequestService {
     }
   }
 }
+
+final rescueRequestServiceProvider = Provider<RescueRequestService>((ref) {
+  return RescueRequestService();
+});

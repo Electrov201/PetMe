@@ -18,6 +18,8 @@ import '../services/health_prediction_service.dart';
 import '../services/cloudinary_service.dart';
 import '../services/organization_service.dart';
 import '../models/organization_model.dart';
+import '../services/places_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 // Auth Providers
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
@@ -75,15 +77,34 @@ final organizationStreamProvider =
   return repository.streamOrganization(id);
 });
 
-final nearbyOrganizationsProvider = FutureProvider.family<
-    List<OrganizationModel>,
-    ({double latitude, double longitude, double radius})>((ref, params) async {
-  final repository = ref.watch(organizationRepositoryProvider);
-  return repository.getNearbyOrganizations(
-    params.latitude,
-    params.longitude,
-    params.radius,
-  );
+final placesServiceProvider = Provider<PlacesService>((ref) => PlacesService());
+
+final userLocationProvider = FutureProvider<Position>((ref) async {
+  bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  if (!serviceEnabled) {
+    throw Exception('Location services are disabled');
+  }
+
+  LocationPermission permission = await Geolocator.checkPermission();
+  if (permission == LocationPermission.denied) {
+    permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied) {
+      throw Exception('Location permissions are denied');
+    }
+  }
+
+  if (permission == LocationPermission.deniedForever) {
+    throw Exception('Location permissions are permanently denied');
+  }
+
+  return await Geolocator.getCurrentPosition();
+});
+
+final nearbyOrganizationsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final position = await ref.watch(userLocationProvider.future);
+  final placesService = ref.read(placesServiceProvider);
+  return placesService.searchNearbyOrganizations(position);
 });
 
 final rescueRequestRepositoryProvider =

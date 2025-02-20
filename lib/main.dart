@@ -31,7 +31,9 @@ import 'presentation/screens/profile/favorites_screen.dart';
 import 'presentation/screens/profile/my_pets_screen.dart';
 import 'presentation/screens/profile/settings_screen.dart';
 import 'presentation/screens/rescue_request/rescue_request_screen.dart';
-import 'presentation/screens/feeding_point/feeding_point_screen.dart';
+import 'presentation/screens/feeding_points/feeding_points_screen.dart';
+import 'presentation/screens/feeding_points/add_feeding_point_screen.dart';
+import 'presentation/screens/feeding_points/feeding_point_details_screen.dart';
 import 'presentation/screens/veterinary/veterinary_screen.dart';
 import 'presentation/screens/donation/donation_screen.dart';
 import 'presentation/screens/health_prediction/health_prediction_screen.dart';
@@ -43,17 +45,14 @@ import 'presentation/screens/chat/chat_screen.dart';
 import 'presentation/screens/chat/chat_detail_screen.dart';
 import 'presentation/screens/veterinary/add_veterinary_screen.dart';
 import 'presentation/screens/veterinary/veterinary_details_screen.dart';
-import 'presentation/screens/feeding_point/add_feeding_point_screen.dart';
-import 'presentation/screens/feeding_point/feeding_point_details_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
+  final rootNavigatorKey = GlobalKey<NavigatorState>();
+  final shellNavigatorKey = GlobalKey<NavigatorState>();
+
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/',
-    errorBuilder: (context, state) => const SplashScreen(),
-    redirect: (context, state) {
-      // Add any global redirection logic here if needed
-      return null;
-    },
     routes: [
       GoRoute(
         path: '/',
@@ -70,24 +69,35 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         name: 'register',
         builder: (context, state) => const RegisterScreen(),
       ),
-      GoRoute(
-        path: '/home',
-        name: 'home',
-        builder: (context, state) => const HomeScreen(),
+      ShellRoute(
+        navigatorKey: shellNavigatorKey,
+        builder: (context, state, child) {
+          return HomeScreen(
+            initialPath: state.uri.path,
+            child: child,
+          );
+        },
         routes: [
           GoRoute(
-            path: 'pets',
+            path: '/home',
+            name: 'home',
+            builder: (context, state) => const PetsScreen(),
+          ),
+          GoRoute(
+            path: '/home/pets',
             name: 'pets',
             builder: (context, state) => const PetsScreen(),
             routes: [
               GoRoute(
                 path: 'add',
                 name: 'add-new-pet',
+                parentNavigatorKey: rootNavigatorKey,
                 builder: (context, state) => const AddPetScreen(),
               ),
               GoRoute(
                 path: ':id',
                 name: 'pet-details',
+                parentNavigatorKey: rootNavigatorKey,
                 builder: (context, state) {
                   final petId = state.pathParameters['id']!;
                   final userId = state.extra as String? ??
@@ -102,18 +112,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
           GoRoute(
-            path: 'organizations',
+            path: '/home/organizations',
             name: 'organizations',
             builder: (context, state) => const OrganizationScreen(),
             routes: [
               GoRoute(
                 path: 'register',
                 name: 'register-organization',
+                parentNavigatorKey: rootNavigatorKey,
                 builder: (context, state) => const RegisterOrganizationScreen(),
               ),
               GoRoute(
                 path: ':id',
                 name: 'organization-details',
+                parentNavigatorKey: rootNavigatorKey,
                 builder: (context, state) => OrganizationDetailsScreen(
                   organizationId: state.pathParameters['id']!,
                 ),
@@ -121,141 +133,123 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
           GoRoute(
-            path: 'map',
+            path: '/home/rescue-requests',
+            name: 'rescueRequests',
+            builder: (context, state) => const RescueRequestScreen(),
+          ),
+          GoRoute(
+            path: '/home/map',
             name: 'map',
             builder: (context, state) => const MapScreen(),
           ),
           GoRoute(
-            path: 'profile',
+            path: '/home/profile',
             name: 'profile',
             builder: (context, state) => const ProfileScreen(),
             routes: [
               GoRoute(
                 path: 'my-pets',
                 name: 'my-pets',
+                parentNavigatorKey: rootNavigatorKey,
                 builder: (context, state) => const MyPetsScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'add',
-                    name: 'add-my-pet',
-                    builder: (context, state) => const AddPetScreen(),
-                  ),
-                  GoRoute(
-                    path: ':id',
-                    name: 'my-pet-details',
-                    builder: (context, state) {
-                      final petId = state.pathParameters['id']!;
-                      final userId =
-                          FirebaseAuth.instance.currentUser?.uid ?? '';
-                      return PetDetailsScreen(
-                        petId: petId,
-                        userId: userId,
-                      );
-                    },
-                  ),
-                ],
               ),
               GoRoute(
                 path: 'favorites',
                 name: 'favorites',
+                parentNavigatorKey: rootNavigatorKey,
                 builder: (context, state) => const FavoritesScreen(),
               ),
               GoRoute(
                 path: 'activity-history',
                 name: 'activity-history',
+                parentNavigatorKey: rootNavigatorKey,
                 builder: (context, state) => const ActivityHistoryScreen(),
               ),
               GoRoute(
                 path: 'settings',
                 name: 'settings',
+                parentNavigatorKey: rootNavigatorKey,
                 builder: (context, state) => const SettingsScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'edit',
-                    name: 'profile-edit',
-                    builder: (context, state) => const ProfileEditScreen(),
-                  ),
-                  GoRoute(
-                    path: 'notifications',
-                    name: 'notification-settings',
-                    builder: (context, state) =>
-                        const NotificationSettingsScreen(),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          GoRoute(
-            path: 'rescue-requests',
-            name: 'rescueRequests',
-            builder: (context, state) => const RescueRequestScreen(),
-          ),
-          GoRoute(
-            path: 'feeding-points',
-            name: 'feedingPoints',
-            builder: (context, state) => const FeedingPointScreen(),
-            routes: [
-              GoRoute(
-                path: 'add',
-                name: 'add-feeding-point',
-                builder: (context, state) => const AddFeedingPointScreen(),
-              ),
-              GoRoute(
-                path: ':id',
-                name: 'feeding-point-details',
-                builder: (context, state) => FeedingPointDetailsScreen(
-                  pointId: state.pathParameters['id']!,
-                ),
-              ),
-            ],
-          ),
-          GoRoute(
-            path: 'veterinaries',
-            name: 'veterinaries',
-            builder: (context, state) => const VeterinaryScreen(),
-            routes: [
-              GoRoute(
-                path: 'add',
-                name: 'add-veterinary',
-                builder: (context, state) => const AddVeterinaryScreen(),
-              ),
-              GoRoute(
-                path: ':id',
-                name: 'veterinary-details',
-                builder: (context, state) => VeterinaryDetailsScreen(
-                  vetId: state.pathParameters['id']!,
-                ),
-              ),
-            ],
-          ),
-          GoRoute(
-            path: 'donations/:petId',
-            name: 'donations',
-            builder: (context, state) {
-              final petId = state.pathParameters['petId'] ?? '';
-              return DonationScreen(petId: petId);
-            },
-          ),
-          GoRoute(
-            path: 'health-prediction',
-            name: 'healthPrediction',
-            builder: (context, state) => const HealthPredictionScreen(),
-          ),
-          GoRoute(
-            path: 'chat',
-            name: 'chat',
-            builder: (context, state) => const ChatScreen(),
-            routes: [
-              GoRoute(
-                path: ':chatId',
-                name: 'chat-detail',
-                builder: (context, state) => ChatDetailScreen(
-                  chat: state.extra as ChatModel,
-                ),
               ),
             ],
           ),
         ],
+      ),
+      // Additional routes that should be full screen
+      GoRoute(
+        path: '/home/health-prediction',
+        name: 'healthPrediction',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const HealthPredictionScreen(),
+      ),
+      GoRoute(
+        path: '/home/chat',
+        name: 'chat',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ChatScreen(),
+        routes: [
+          GoRoute(
+            path: ':chatId',
+            name: 'chat-detail',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (context, state) => ChatDetailScreen(
+              chat: state.extra as ChatModel,
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/home/feeding-points',
+        name: 'feedingPoints',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const FeedingPointsScreen(),
+        routes: [
+          GoRoute(
+            path: 'add',
+            name: 'add-feeding-point',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (context, state) => const AddFeedingPointScreen(),
+          ),
+          GoRoute(
+            path: ':id',
+            name: 'feeding-point-details',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (context, state) => FeedingPointDetailsScreen(
+              pointId: state.pathParameters['id']!,
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/home/veterinaries',
+        name: 'veterinaries',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const VeterinaryScreen(),
+        routes: [
+          GoRoute(
+            path: 'add',
+            name: 'add-veterinary',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (context, state) => const AddVeterinaryScreen(),
+          ),
+          GoRoute(
+            path: ':id',
+            name: 'veterinary-details',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (context, state) => VeterinaryDetailsScreen(
+              vetId: state.pathParameters['id']!,
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/home/donations/:petId',
+        name: 'donations',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final petId = state.pathParameters['petId'] ?? '';
+          return DonationScreen(petId: petId);
+        },
       ),
     ],
   );
@@ -291,14 +285,22 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(goRouterProvider);
-
     return MaterialApp.router(
       title: AppConfig.appName,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      routerConfig: router,
+      routerDelegate: router.routerDelegate,
+      routeInformationParser: router.routeInformationParser,
+      routeInformationProvider: router.routeInformationProvider,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return MediaQuery(
+          // Prevent system text scaling from affecting the app
+          data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
+          child: child!,
+        );
+      },
     );
   }
 }

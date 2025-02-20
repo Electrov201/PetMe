@@ -5,208 +5,269 @@ import '../../../core/models/organization_model.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class OrganizationScreen extends ConsumerStatefulWidget {
-  const OrganizationScreen({Key? key}) : super(key: key);
-
-  @override
-  ConsumerState<OrganizationScreen> createState() => _OrganizationScreenState();
-}
-
-class _OrganizationScreenState extends ConsumerState<OrganizationScreen> {
-  String _searchQuery = '';
-  OrganizationType? _selectedType;
+class OrganizationScreen extends ConsumerWidget {
+  const OrganizationScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final nearbyOrganizations = ref.watch(nearbyOrganizationsProvider);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Organizations'),
+        title: const Text('Nearby Organizations'),
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
-            onPressed: _showFilterDialog,
-          ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: _showSearchDialog,
+            onPressed: () {
+              // TODO: Implement filters
+            },
           ),
         ],
       ),
-      body: Column(
-        children: [
-          if (_searchQuery.isNotEmpty || _selectedType != null)
-            Padding(
-              padding: const EdgeInsets.all(AppTheme.spacing8),
-              child: Row(
-                children: [
-                  if (_searchQuery.isNotEmpty)
-                    Chip(
-                      label: Text('Search: $_searchQuery'),
-                      onDeleted: () => setState(() => _searchQuery = ''),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: nearbyOrganizations.when(
+                data: (organizations) {
+                  if (organizations.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.location_off,
+                            size: 64,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withOpacity(0.5),
+                          ),
+                          const SizedBox(height: AppTheme.spacing16),
+                          Text(
+                            'No organizations found nearby',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.7),
+                                ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.only(
+                      left: AppTheme.spacing16,
+                      right: AppTheme.spacing16,
+                      top: AppTheme.spacing16,
+                      bottom: AppTheme.spacing16,
                     ),
-                  if (_selectedType != null)
-                    Chip(
-                      label: Text(
-                          'Type: ${_selectedType.toString().split('.').last}'),
-                      onDeleted: () => setState(() => _selectedType = null),
-                    ),
-                ],
+                    itemCount: organizations.length,
+                    itemBuilder: (context, index) {
+                      final organization = organizations[index];
+                      final photos = organization['photos'] as List<dynamic>?;
+                      final photoReference = photos?.isNotEmpty == true
+                          ? photos?.first['photo_reference'] as String?
+                          : null;
+
+                      return Card(
+                        margin:
+                            const EdgeInsets.only(bottom: AppTheme.spacing16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (photoReference != null)
+                              FutureBuilder<String>(
+                                future: ref
+                                    .read(placesServiceProvider)
+                                    .getPlacePhoto(photoReference),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasData) {
+                                    return Image.network(
+                                      snapshot.data!,
+                                      height: 200,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                    );
+                                  }
+                                  return const SizedBox(height: 200);
+                                },
+                              ),
+                            Padding(
+                              padding: const EdgeInsets.all(AppTheme.spacing16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          organization['name'] as String? ??
+                                              'Unknown',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleLarge
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                        ),
+                                      ),
+                                      if (organization['rating'] != null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppTheme.spacing8,
+                                            vertical: AppTheme.spacing4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary
+                                                .withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(
+                                                AppTheme.radius16),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.star,
+                                                size: 16,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                organization['rating']
+                                                    .toString(),
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .primary,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: AppTheme.spacing8),
+                                  if (organization['vicinity'] != null)
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.location_on,
+                                          size: 16,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                        ),
+                                        const SizedBox(
+                                            width: AppTheme.spacing8),
+                                        Expanded(
+                                          child: Text(
+                                            organization['vicinity'] as String,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  const SizedBox(height: AppTheme.spacing16),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      OutlinedButton.icon(
+                                        onPressed: () {
+                                          final placeId =
+                                              organization['place_id']
+                                                  as String;
+                                          context
+                                              .push('/organizations/$placeId');
+                                        },
+                                        icon: const Icon(Icons.info),
+                                        label: const Text('Details'),
+                                      ),
+                                      OutlinedButton.icon(
+                                        onPressed: () {
+                                          final lat = organization['geometry']
+                                              ['location']['lat'] as double;
+                                          final lng = organization['geometry']
+                                              ['location']['lng'] as double;
+                                          _launchMaps(lat, lng);
+                                        },
+                                        icon: const Icon(Icons.directions),
+                                        label: const Text('Directions'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stackTrace) => Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(height: AppTheme.spacing16),
+                      Text(
+                        'Error loading organizations',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                      ),
+                      const SizedBox(height: AppTheme.spacing8),
+                      Text(
+                        error.toString(),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: AppTheme.spacing16),
+                      ElevatedButton(
+                        onPressed: () =>
+                            ref.refresh(nearbyOrganizationsProvider),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-          Expanded(
-            child: StreamBuilder<List<OrganizationModel>>(
-              stream: _getFilteredOrganizations(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 48,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(height: AppTheme.spacing8),
-                        Text(
-                          'Error: ${snapshot.error}',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final organizations = snapshot.data ?? [];
-                if (organizations.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 48,
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                        const SizedBox(height: AppTheme.spacing8),
-                        Text(
-                          'No organizations found',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(AppTheme.spacing16),
-                  itemCount: organizations.length,
-                  itemBuilder: (context, index) {
-                    final org = organizations[index];
-                    return OrganizationCard(
-                      organization: org,
-                      onReport: (reason) => _handleReport(org, reason),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/organizations/register'),
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-
-  Stream<List<OrganizationModel>> _getFilteredOrganizations() {
-    final organizationService = ref.read(organizationServiceProvider);
-    if (_selectedType != null) {
-      return organizationService.streamOrganizationsByType(_selectedType!);
-    }
-    return organizationService.streamOrganizations();
-  }
-
-  Future<void> _showFilterDialog() async {
-    final selectedType = await showDialog<OrganizationType>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filter by Type'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: OrganizationType.values
-              .map(
-                (type) => ListTile(
-                  title: Text(type.toString().split('.').last),
-                  onTap: () => Navigator.pop(context, type),
-                ),
-              )
-              .toList(),
+          ],
         ),
       ),
     );
-
-    if (selectedType != null) {
-      setState(() => _selectedType = selectedType);
-    }
   }
 
-  Future<void> _showSearchDialog() async {
-    final controller = TextEditingController(text: _searchQuery);
-    final query = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Search Organizations'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Enter organization name',
-          ),
-          autofocus: true,
-          onSubmitted: (value) => Navigator.pop(context, value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Search'),
-          ),
-        ],
-      ),
-    );
-
-    if (query != null) {
-      setState(() => _searchQuery = query);
-    }
-  }
-
-  Future<void> _handleReport(
-      OrganizationModel organization, String reason) async {
-    final organizationService = ref.read(organizationServiceProvider);
-    final currentUser = ref.read(authStateProvider).value;
-
-    if (currentUser != null) {
-      await organizationService.reportOrganization(
-        organization.id,
-        currentUser.id,
-        reason,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Report submitted')),
-        );
-      }
+  Future<void> _launchMaps(double lat, double lng) async {
+    final uri = Uri.parse('geo:$lat,$lng');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
     }
   }
 }

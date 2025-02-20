@@ -1,60 +1,89 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum EmergencyLevel { low, medium, high, critical }
-
-class RescueRequestModel {
+class RescueRequest {
   final String id;
-  final String location;
-  final String description;
-  final EmergencyLevel emergencyLevel;
   final String userId;
-  final Timestamp createdAt;
+  final String title;
+  final String description;
+  final String location;
+  final double latitude;
+  final double longitude;
+  final String imageUrl;
+  final bool isDone;
+  final DateTime createdAt;
+  final String? handledBy;
 
-  RescueRequestModel({
+  RescueRequest({
     required this.id,
-    required this.location,
-    required this.description,
-    required this.emergencyLevel,
     required this.userId,
+    required this.title,
+    required this.description,
+    required this.location,
+    required this.latitude,
+    required this.longitude,
+    required this.imageUrl,
+    this.isDone = false,
     required this.createdAt,
+    this.handledBy,
   });
 
-  // Convert to JSON for storing in Firestore
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'location': location,
-      'description': description,
-      'emergencyLevel': emergencyLevel.toString(),
-      'userId': userId,
-      'createdAt': createdAt,
-    };
-  }
-
-  // Create from map for retrieving from Firestore
-  factory RescueRequestModel.fromMap(Map<String, dynamic> map) {
-    return RescueRequestModel(
-      id: map['id'] as String,
-      location: map['location'] as String,
-      description: map['description'] as String,
-      emergencyLevel: _stringToEmergencyLevel(map['emergencyLevel'] as String),
-      userId: map['userId'] as String,
-      createdAt: map['createdAt'] as Timestamp,
+  factory RescueRequest.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return RescueRequest(
+      id: doc.id,
+      userId: data['userId'] ?? '',
+      title: data['title'] ?? '',
+      description: data['description'] ?? '',
+      location: data['location'] ?? '',
+      latitude: (data['latitude'] ?? 0.0).toDouble(),
+      longitude: (data['longitude'] ?? 0.0).toDouble(),
+      imageUrl: data['imageUrl'] ?? '',
+      isDone: data['isDone'] ?? false,
+      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      handledBy: data['handledBy'],
     );
   }
 
-  static EmergencyLevel _stringToEmergencyLevel(String emergencyLevelString) {
-    switch (emergencyLevelString) {
-      case 'EmergencyLevel.low':
-        return EmergencyLevel.low;
-      case 'EmergencyLevel.medium':
-        return EmergencyLevel.medium;
-      case 'EmergencyLevel.high':
-        return EmergencyLevel.high;
-      case 'EmergencyLevel.critical':
-        return EmergencyLevel.critical;
-      default:
-        return EmergencyLevel.medium;
-    }
+  Map<String, dynamic> toFirestore() {
+    return {
+      'userId': userId,
+      'title': title,
+      'description': description,
+      'location': location,
+      'latitude': latitude,
+      'longitude': longitude,
+      'imageUrl': imageUrl,
+      'isDone': isDone,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'handledBy': handledBy,
+    };
+  }
+
+  RescueRequest copyWith({
+    String? id,
+    String? userId,
+    String? title,
+    String? description,
+    String? location,
+    double? latitude,
+    double? longitude,
+    String? imageUrl,
+    bool? isDone,
+    DateTime? createdAt,
+    String? handledBy,
+  }) {
+    return RescueRequest(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      location: location ?? this.location,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      imageUrl: imageUrl ?? this.imageUrl,
+      isDone: isDone ?? this.isDone,
+      createdAt: createdAt ?? this.createdAt,
+      handledBy: handledBy ?? this.handledBy,
+    );
   }
 }
